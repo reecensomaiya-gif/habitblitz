@@ -479,7 +479,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
       <header className="border-b border-slate-800/80 bg-slate-950/70 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:flex-nowrap sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/30">
               HB
@@ -504,15 +504,15 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-        <section className="space-y-6">
+      <main className="mx-auto max-w-6xl px-3 py-6 sm:px-6 lg:px-8 lg:py-10">
+        <section className="space-y-5 sm:space-y-6">
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300/90">
                 Today&apos;s score
               </p>
               <div className="mt-2 flex items-baseline gap-3">
-                <p className="text-4xl font-semibold tracking-tight sm:text-5xl">
+                <p className="text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">
                   {todayScore}
                 </p>
                 <p className="text-sm text-slate-400">
@@ -537,8 +537,8 @@ export default function DashboardPage() {
             </div>
           </header>
 
-          <div className="flex flex-col gap-4 rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-4 border-b border-slate-800/80 pb-3">
+          <div className="flex flex-col gap-4 rounded-2xl border border-slate-800/80 bg-slate-900/60 p-3 sm:p-5">
+            <div className="flex flex-col items-start justify-between gap-3 border-b border-slate-800/80 pb-3 sm:flex-row sm:items-center sm:gap-4">
               <div className="flex items-center gap-2 text-xs text-slate-400">
                 <button
                   type="button"
@@ -562,7 +562,7 @@ export default function DashboardPage() {
                   ›
                 </button>
               </div>
-              <div className="flex gap-2 text-[0.68rem] text-slate-500">
+              <div className="flex flex-wrap gap-2 text-[0.65rem] text-slate-500 sm:text-[0.68rem]">
                 <span className="inline-flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-emerald-400" /> Done
                 </span>
@@ -578,7 +578,7 @@ export default function DashboardPage() {
 
             <div className="overflow-x-auto">
               <div className="min-w-full space-y-2">
-                <div className="grid grid-cols-[minmax(0,2.2fr)_repeat(7,minmax(0,1fr))] items-end gap-2 text-xs text-slate-400">
+                <div className="grid grid-cols-[minmax(0,2.2fr)_repeat(7,minmax(0,1fr))] items-end gap-2 text-[0.6rem] text-slate-400 sm:text-xs">
                   <div className="text-[0.7rem] uppercase tracking-[0.18em] text-slate-500">
                     Habit
                   </div>
@@ -609,19 +609,19 @@ export default function DashboardPage() {
                       key={habit.id}
                       className="grid grid-cols-[minmax(0,2.2fr)_repeat(7,minmax(0,1fr))] items-center gap-2"
                     >
-                      <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-950/40 px-3 py-2">
+                      <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-950/40 px-2 py-2 sm:px-3">
                         <div>
                           <p className="text-sm font-medium text-slate-50">
                             {habit.name}
                           </p>
-                          <p className="mt-0.5 text-[0.7rem] text-slate-500">
+                            <p className="mt-0.5 text-[0.65rem] text-slate-500 sm:text-[0.7rem]">
                             {habit.points} pts · Streak{" "}
                             <span className="font-semibold text-emerald-300">
                               0
                             </span>
                           </p>
                         </div>
-                        <span className="rounded-full bg-slate-900/90 px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        <span className="rounded-full bg-slate-900/90 px-2 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-slate-400 sm:text-[0.65rem]">
                           +{habit.points}
                         </span>
                       </div>

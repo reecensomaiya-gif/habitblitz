@@ -9,12 +9,21 @@ export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSuccessMessage(null);
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setLoading(true);
     const { error } = await supabase.auth.signUp({ email, password });
     setLoading(false);
@@ -22,8 +31,9 @@ export default function SignupPage() {
       setError(error.message);
       return;
     }
-    router.push("/dashboard");
-    router.refresh();
+    setSuccessMessage(
+      "Please check your email and click the confirmation link to activate your account"
+    );
   }
 
   return (
@@ -54,6 +64,11 @@ export default function SignupPage() {
             {error && (
               <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
                 {error}
+              </div>
+            )}
+            {successMessage && (
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+                {successMessage}
               </div>
             )}
             <div>
@@ -95,6 +110,25 @@ export default function SignupPage() {
               <p className="mt-1 text-xs text-slate-500">
                 At least 6 characters
               </p>
+            </div>
+            <div>
+              <label
+                htmlFor="confirm-password"
+                className="block text-sm font-medium text-slate-300"
+              >
+                Confirm password
+              </label>
+              <input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+                minLength={6}
+                className="mt-1.5 w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-4 py-3 text-slate-50 placeholder-slate-500 focus:border-emerald-500/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                placeholder="••••••••"
+              />
             </div>
             <button
               type="submit"
