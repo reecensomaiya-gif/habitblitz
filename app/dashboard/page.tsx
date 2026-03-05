@@ -94,21 +94,127 @@ export default function DashboardPage() {
     doom: false,
   });
   const [weeklyHabitStates, setWeeklyHabitStates] = useState<Record<string, boolean>>({});
+   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
-    (async () => {
+
+    async function loadWeekData() {
+      setIsLoading(true);
+
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
+
       if (!isMounted) return;
-      setUserEmail(user?.email ?? null);
-    })();
+
+      if (!user || userError) {
+        setUserId(null);
+        setUserEmail(null);
+        setHabitStates({});
+        setWeeklyHabitStates({});
+        setPenalties({
+          junk: false,
+          alcohol: false,
+          doom: false,
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      setUserId(user.id);
+      setUserEmail(user.email ?? null);
+
+      const baseMonday = getMonday(today);
+      const monday = new Date(baseMonday);
+      monday.setDate(baseMonday.getDate() + weekOffset * 7);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+
+      const startKey = formatKey(monday);
+      const endKey = formatKey(sunday);
+      const todayKeyLocal = formatKey(today);
+
+      const [logsRes, penaltiesRes] = await Promise.all([
+        supabase
+          .from("habit_logs")
+          .select("habit_id, logged_date, value")
+          .eq("user_id", user.id)
+          .gte("logged_date", startKey)
+          .lte("logged_date", endKey),
+        supabase
+          .from("penalties")
+          .select("penalty_type, points, penalty_date")
+          .eq("user_id", user.id)
+          .eq("penalty_date", todayKeyLocal),
+      ]);
+
+      if (!isMounted) return;
+
+      const nextHabitStates: Record<string, HabitState> = {};
+      const nextWeeklyStates: Record<string, boolean> = {};
+
+      if (!logsRes.error && logsRes.data) {
+        logsRes.data.forEach((row: any) => {
+          const rawDate = row.logged_date;
+          const dateKey =
+            typeof rawDate === "string"
+              ? rawDate.slice(0, 10)
+              : formatKey(new Date(rawDate));
+
+          const habit =
+            HABITS.find((h) => h.name === row.habit_id) ||
+            WEEKLY_HABITS.find((h) => h.name === row.habit_id);
+
+          if (!habit) return;
+
+          const stateKey = `${habit.id}-${dateKey}`;
+          const value = row.value;
+
+          if (WEEKLY_HABITS.some((h) => h.id === habit.id)) {
+            nextWeeklyStates[stateKey] = value === 1;
+          } else {
+            const mapped: HabitState = value === 1 ? "completed" : "missed";
+            nextHabitStates[stateKey] = mapped;
+          }
+        });
+      }
+
+      setHabitStates(nextHabitStates);
+      setWeeklyHabitStates(nextWeeklyStates);
+
+      const nextPenalties: Record<PenaltyId, boolean> = {
+        junk: false,
+        alcohol: false,
+        doom: false,
+      };
+
+      if (!penaltiesRes.error && penaltiesRes.data) {
+        penaltiesRes.data.forEach((row: any) => {
+          const type = row.penalty_type as PenaltyId;
+          if (
+            type in nextPenalties &&
+            typeof row.points === "number" &&
+            row.points < 0
+          ) {
+            nextPenalties[type] = true;
+          }
+        });
+      }
+
+      setPenalties(nextPenalties);
+      setIsLoading(false);
+    }
+
+    loadWeekData();
+
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [today, weekOffset]);
 
   const weekDays: WeekDay[] = useMemo(() => {
     const baseMonday = getMonday(today);
@@ -140,15 +246,71 @@ export default function DashboardPage() {
     return "none";
   }
 
-  function handleCellClick(habit: Habit, day: WeekDay) {
+  async function handleCellClick(habit: Habit, day: WeekDay) {
     const isWeekend = day.weekdayIndex === 0 || day.weekdayIndex === 6;
     if (habit.monFriOnly && isWeekend) return;
+    if (!userId) return;
 
     const key = `${habit.id}-${day.key}`;
+    const current = habitStates[key] ?? "none";
+    const next = cycleHabitState(current);
+
     setHabitStates((prev) => ({
       ...prev,
-      [key]: cycleHabitState(prev[key] ?? "none"),
+      [key]: next,
     }));
+
+    const habitIdentifier = habit.name;
+    const loggedDate = day.key;
+
+    if (next === "none") {
+      const { error } = await supabase
+        .from("habit_logs")
+        .delete()
+        .eq("user_id", userId)
+        .eq("habit_id", habitIdentifier)
+        .eq("logged_date", loggedDate);
+
+      if (error) {
+        console.error("Failed to delete habit_log", {
+          userId,
+          habitIdentifier,
+          loggedDate,
+          error,
+        });
+      } else {
+        console.log("Deleted habit_log", {
+          userId,
+          habitIdentifier,
+          loggedDate,
+        });
+      }
+    } else {
+      const value = next === "completed" ? 1 : 0;
+      const { error } = await supabase.from("habit_logs").upsert({
+        user_id: userId,
+        habit_id: habitIdentifier,
+        logged_date: loggedDate,
+        value,
+      });
+
+      if (error) {
+        console.error("Failed to upsert habit_log", {
+          userId,
+          habitIdentifier,
+          loggedDate,
+          value,
+          error,
+        });
+      } else {
+        console.log("Upserted habit_log", {
+          userId,
+          habitIdentifier,
+          loggedDate,
+          value,
+        });
+      }
+    }
   }
 
   function getCellState(habit: Habit, day: WeekDay): HabitState {
@@ -160,16 +322,92 @@ export default function DashboardPage() {
     return habitStates[key] ?? "none";
   }
 
-  function togglePenalty(id: PenaltyId) {
-    setPenalties((prev) => ({ ...prev, [id]: !prev[id] }));
+  async function togglePenalty(id: PenaltyId) {
+    if (!userId) return;
+
+    const next = !penalties[id];
+    setPenalties((prev) => ({ ...prev, [id]: next }));
+
+    const penaltyDate = todayKey;
+    const points = -PENALTY_VALUES[id];
+
+    if (!next) {
+      await supabase
+        .from("penalties")
+        .delete()
+        .eq("user_id", userId)
+        .eq("penalty_type", id)
+        .eq("penalty_date", penaltyDate);
+    } else {
+      await supabase.from("penalties").upsert({
+        user_id: userId,
+        penalty_type: id,
+        penalty_date: penaltyDate,
+        points,
+      });
+    }
   }
 
-  function toggleWeeklyHabit(id: HabitId) {
-    const key = `${id}-${todayKey}`;
+  async function toggleWeeklyHabit(habit: Habit) {
+    if (!userId) return;
+
+    const key = `${habit.id}-${todayKey}`;
+    const next = !(weeklyHabitStates[key] ?? false);
+
     setWeeklyHabitStates((prev) => ({
       ...prev,
-      [key]: !prev[key],
+      [key]: next,
     }));
+
+    const loggedDate = todayKey;
+    const habitIdentifier = habit.name;
+
+    if (!next) {
+      const { error } = await supabase
+        .from("habit_logs")
+        .delete()
+        .eq("user_id", userId)
+        .eq("habit_id", habitIdentifier)
+        .eq("logged_date", loggedDate);
+
+      if (error) {
+        console.error("Failed to delete weekly habit_log", {
+          userId,
+          habitIdentifier,
+          loggedDate,
+          error,
+        });
+      } else {
+        console.log("Deleted weekly habit_log", {
+          userId,
+          habitIdentifier,
+          loggedDate,
+        });
+      }
+    } else {
+      const { error } = await supabase.from("habit_logs").upsert({
+        user_id: userId,
+        habit_id: habitIdentifier,
+        logged_date: loggedDate,
+        value: 1,
+      });
+
+      if (error) {
+        console.error("Failed to upsert weekly habit_log", {
+          userId,
+          habitIdentifier,
+          loggedDate,
+          error,
+        });
+      } else {
+        console.log("Upserted weekly habit_log", {
+          userId,
+          habitIdentifier,
+          loggedDate,
+          value: 1,
+        });
+      }
+    }
   }
 
   const todayScore = useMemo(() => {
@@ -254,6 +492,11 @@ export default function DashboardPage() {
             <span className="hidden rounded-full border border-slate-800/80 bg-slate-900/80 px-3 py-1 text-slate-300 sm:inline-flex">
               {userEmail ?? "Loading…"}
             </span>
+            {isLoading && (
+              <span className="hidden text-[0.65rem] text-slate-500 sm:inline">
+                Syncing…
+              </span>
+            )}
             <button className="rounded-full border border-slate-700/80 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-slate-500 hover:bg-slate-800/70 hover:text-slate-50">
               Sign out
             </button>
@@ -410,7 +653,7 @@ export default function DashboardPage() {
                   <button
                     key={habit.id}
                     type="button"
-                    onClick={() => toggleWeeklyHabit(habit.id)}
+                    onClick={() => toggleWeeklyHabit(habit)}
                     className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm transition ${
                       checked
                         ? "border-emerald-400/80 bg-emerald-500/15 text-emerald-50 shadow-[0_0_25px_rgba(52,211,153,0.35)]"
