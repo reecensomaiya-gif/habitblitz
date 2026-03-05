@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
@@ -43,9 +45,12 @@ export default function Home() {
               </p>
             </div>
             <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-start">
-              <button className="inline-flex items-center justify-center rounded-full bg-emerald-400 px-7 py-3 text-sm font-semibold text-slate-950 shadow-[0_18px_60px_rgba(16,185,129,0.35)] transition hover:bg-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">
+              <Link
+                href="/signup"
+                className="inline-flex items-center justify-center rounded-full bg-emerald-400 px-7 py-3 text-sm font-semibold text-slate-950 shadow-[0_18px_60px_rgba(16,185,129,0.35)] transition hover:bg-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+              >
                 Get Started
-              </button>
+              </Link>
               <p className="text-xs text-slate-400">
                 No clutter. No noise. Just your next habit.
               </p>
