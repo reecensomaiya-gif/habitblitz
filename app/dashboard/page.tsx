@@ -94,7 +94,8 @@ export default function DashboardPage() {
     doom: false,
   });
   const [weeklyHabitStates, setWeeklyHabitStates] = useState<Record<string, boolean>>({});
-   const [userId, setUserId] = useState<string | null>(null);
+  const [habitStreaks, setHabitStreaks] = useState<Record<string, number>>({});
+  const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -128,23 +129,21 @@ export default function DashboardPage() {
       setUserId(user.id);
       setUserEmail(user.email ?? null);
 
-      const baseMonday = getMonday(today);
-      const monday = new Date(baseMonday);
-      monday.setDate(baseMonday.getDate() + weekOffset * 7);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-
-      const startKey = formatKey(monday);
-      const endKey = formatKey(sunday);
       const todayKeyLocal = formatKey(today);
+
+      const streakWindowDays = 90;
+      const streakStartDate = new Date(today);
+      streakStartDate.setDate(streakStartDate.getDate() - streakWindowDays);
+      streakStartDate.setHours(0, 0, 0, 0);
+      const logsStartKey = formatKey(streakStartDate);
 
       const [logsRes, penaltiesRes] = await Promise.all([
         supabase
           .from("habit_logs")
           .select("habit_id, logged_date, value")
           .eq("user_id", user.id)
-          .gte("logged_date", startKey)
-          .lte("logged_date", endKey),
+          .gte("logged_date", logsStartKey)
+          .lte("logged_date", todayKeyLocal),
         supabase
           .from("penalties")
           .select("penalty_type, points, penalty_date")
@@ -156,6 +155,7 @@ export default function DashboardPage() {
 
       const nextHabitStates: Record<string, HabitState> = {};
       const nextWeeklyStates: Record<string, boolean> = {};
+      const logsByHabit: Record<string, Record<string, number>> = {};
 
       if (!logsRes.error && logsRes.data) {
         logsRes.data.forEach((row: any) => {
@@ -179,12 +179,53 @@ export default function DashboardPage() {
           } else {
             const mapped: HabitState = value === 1 ? "completed" : "missed";
             nextHabitStates[stateKey] = mapped;
+
+            if (!logsByHabit[habit.id]) {
+              logsByHabit[habit.id] = {};
+            }
+            logsByHabit[habit.id][dateKey] = value;
           }
         });
       }
 
       setHabitStates(nextHabitStates);
       setWeeklyHabitStates(nextWeeklyStates);
+
+      const nextStreaks: Record<string, number> = {};
+      const streakMinDate = new Date(streakStartDate);
+
+      HABITS.forEach((habit) => {
+        const habitLogs = logsByHabit[habit.id] ?? {};
+        let streak = 0;
+
+        const cursor = new Date(today);
+        cursor.setHours(0, 0, 0, 0);
+
+        // Walk backwards counting consecutive completions
+        while (cursor >= streakMinDate) {
+          const dayOfWeek = cursor.getDay();
+
+          if (habit.monFriOnly && (dayOfWeek === 0 || dayOfWeek === 6)) {
+            cursor.setDate(cursor.getDate() - 1);
+            continue;
+          }
+
+          const key = formatKey(cursor);
+          const value = habitLogs[key];
+
+          if (value === 1) {
+            streak += 1;
+            cursor.setDate(cursor.getDate() - 1);
+            continue;
+          }
+
+          break;
+        }
+
+        nextStreaks[habit.id] = streak;
+      });
+
+      setHabitStreaks(nextStreaks);
 
       const nextPenalties: Record<PenaltyId, boolean> = {
         junk: false,
@@ -614,11 +655,28 @@ export default function DashboardPage() {
                           <p className="text-sm font-medium text-slate-50">
                             {habit.name}
                           </p>
-                            <p className="mt-0.5 text-[0.65rem] text-slate-500 sm:text-[0.7rem]">
-                            {habit.points} pts · Streak{" "}
-                            <span className="font-semibold text-emerald-300">
-                              0
-                            </span>
+                          <p className="mt-0.5 text-[0.65rem] text-slate-500 sm:text-[0.7rem]">
+                            {habit.points} pts ·{" "}
+                            {(() => {
+                              const streak = habitStreaks[habit.id] ?? 0;
+                              if (!streak) {
+                                return "Streak —";
+                              }
+                              const colorClass =
+                                streak >= 3
+                                  ? "text-emerald-300"
+                                  : "text-amber-300";
+                              return (
+                                <>
+                                  Streak{" "}
+                                  <span
+                                    className={`font-semibold ${colorClass}`}
+                                  >
+                                    {streak}
+                                  </span>
+                                </>
+                              );
+                            })()}
                           </p>
                         </div>
                         <span className="rounded-full bg-slate-900/90 px-2 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-slate-400 sm:text-[0.65rem]">
